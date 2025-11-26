@@ -7,10 +7,15 @@ app.use(express.json());
 
 // Simulação de dados processados pelo Python
 const mockData = [
+    // Dados mockados que simulam o resultado do processamento Python (CNES + IBGE + CNPJ)
     {
         municipio_ibge: 3549904,
         nome_municipio: "São José dos Campos",
         populacao_total: 737314,
+        cnpj_enriquecido: {
+            cnpj: "00000000000191",
+            razao_social: "BANCO DO BRASIL SA (Exemplo de enriquecimento CNPJ)"
+        },
         leitos_total: 1500,
         razao_leitos_por_mil: (1500 / 737.314).toFixed(2) // Exemplo de agregação
     },
@@ -18,6 +23,10 @@ const mockData = [
         municipio_ibge: 3550308,
         nome_municipio: "São Paulo",
         populacao_total: 12396372,
+        cnpj_enriquecido: {
+            cnpj: "99999999999999",
+            razao_social: "CLINICA TESTE SA (Exemplo de enriquecimento CNPJ)"
+        },
         leitos_total: 25000,
         razao_leitos_por_mil: (25000 / 12396.372).toFixed(2)
     }

@@ -4,9 +4,12 @@ import time
 from pathlib import Path
 from typing import Optional, Tuple
 
-# --- Constantes (Mockadas para o exemplo) ---
+# --- Constantes ---
+IBGE_API_URL = "https://servicodados.ibge.gov.br/api/v3/agregados"
+BRASILAPI_CNPJ_URL = "https://brasilapi.com.br/api/cnpj/v1"
 # O ID do recurso real deve ser obtido no OPENDATASUS
-OPENDATASUS_CNES_URL = 'https://opendatasus.saude.gov.br/dataset/cnes-cadastro-nacional-de-estabelecimentos-de-saude/resource/MOCK_RESOURCE_ID/download'
+OPENDATASUS_CNES_URL = 'https://opendatasus.saude.gov.br/dataset/cnes-cadastro-nacional-de-estabelecimentos-de-saude/resource/MOCK_RESOURCE_ID/download' # Mocked URL
+NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 
 # --- 11.1 Python: normalize CNPJ ---
@@ -84,6 +87,98 @@ def geocode_address(q: str) -> Tuple[Optional[float], Optional[float]]:
         # Erro de conversão ou estrutura de resposta inesperada
         return None, None
 
+# --- 11.4 Python: Fetcher IBGE (População Municipal) ---
+def fetch_ibge_populacao_municipal(periodo: str = "-1") -> Optional[list]:
+    """
+    Busca a população residente estimada (Tabela 6579, Variável 9324) para todos 
+    os municípios no período especificado.
+    
+    :param periodo: Período de referência. Use '-1' para o mais recente.
+    :return: Lista de dicionários com os dados de população ou None em caso de erro.
+    """
+    # Tabela 6579: População residente estimada
+    # Variável 9324: População residente
+    # Localidade: N6[all] (Todos os municípios)
+    url = f"{IBGE_API_URL}/6579/periodos/{periodo}/variaveis/9324?localidades=N6[all]"
+    headers = {'User-Agent':'HM-ITool/1.0 (Contato: seu.email@exemplo.com)'}
+    
+    try:
+        r = requests.get(url, headers=headers, timeout=30)
+        r.raise_for_status()
+        data = r.json()
+        
+        if not data or not data[0].get('resultados'):
+            print("Aviso: Dados do IBGE não encontrados ou estrutura inesperada.")
+            return None
+            
+        # Extrai o ano de referência
+        ano_referencia = data[0]['resultados'][0]['series'][0]['localidade']['nivel']['id']
+        
+        # Processa os resultados
+        populacao_data = []
+        for resultado in data[0]['resultados']:
+            for serie in resultado['series']:
+                municipio_info = serie['localidade']['nivel']
+                # O código IBGE completo (7 dígitos) está no 'id' da localidade
+                codigo_ibge = serie['localidade']['id']
+                
+                # O valor da população está no dicionário 'serie'
+                # O valor é uma string, precisa ser convertido para int
+                valor_populacao = list(serie['serie'].values())[0]
+                
+                if valor_populacao != '...': # Ignora valores indisponíveis
+                    populacao_data.append({
+                        'codigo_ibge': codigo_ibge,
+                        'nome_municipio': municipio_info['nome'],
+                        'populacao_estimada': int(valor_populacao),
+                        'ano_referencia': ano_referencia
+                    })
+        
+        print(f"Sucesso ao buscar dados do IBGE. {len(populacao_data)} municípios encontrados.")
+        return populacao_data
+        
+    except requests.exceptions.RequestException as e:
+        print(f"Erro ao buscar dados do IBGE: {e}")
+        return None
+    except Exception as e:
+        print(f"Erro inesperado ao processar dados do IBGE: {e}")
+        return None
+
+# --- 11.5 Python: Fetcher BrasilAPI (CNPJ) ---
+def fetch_cnpj_brasilapi(cnpj: str) -> Optional[dict]:
+    """
+    Busca dados de firmografia de um CNPJ usando a BrasilAPI.
+    
+    :param cnpj: CNPJ normalizado (apenas 14 dígitos).
+    :return: Dicionário com os dados da empresa ou None em caso de erro.
+    """
+    url = f"{BRASILAPI_CNPJ_URL}/{cnpj}"
+    headers = {'User-Agent':'HM-ITool/1.0 (Contato: seu.email@exemplo.com)'}
+    
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        r.raise_for_status()
+        
+        data = r.json()
+        
+        if r.status_code == 200:
+            print(f"Sucesso ao buscar CNPJ {cnpj}.")
+            return data
+        else:
+            print(f"Erro ao buscar CNPJ {cnpj}: {data.get('message', 'Erro desconhecido')}")
+            return None
+            
+    except requests.exceptions.HTTPError as e:
+        # A BrasilAPI retorna 404 para CNPJ não encontrado
+        if e.response.status_code == 404:
+            print(f"CNPJ {cnpj} não encontrado na BrasilAPI.")
+        else:
+            print(f"Erro HTTP ao buscar CNPJ {cnpj}: {e}")
+        return None
+    except requests.exceptions.RequestException as e:
+        print(f"Erro de conexão ao buscar CNPJ {cnpj}: {e}")
+        return None
+
 # --- Exemplo de uso (para teste) ---
 if __name__ == "__main__":
     # Teste de normalização de CNPJ
@@ -112,3 +207,28 @@ if __name__ == "__main__":
     lat_2, lon_2 = geocode_address(address_2)
     print(f"Endereço: {address_2}")
     print(f"Latitude, Longitude: {lat_2}, {lon_2}")
+    
+    # --- Teste de Fetching IBGE ---
+    print("\n--- Teste de Fetching IBGE (População Municipal) ---")
+    populacao_data = fetch_ibge_populacao_municipal()
+    if populacao_data:
+        print(f"Primeiros 5 resultados do IBGE:")
+        for item in populacao_data[:5]:
+            print(f"  {item['nome_municipio']} ({item['codigo_ibge']}): {item['populacao_estimada']:,} hab. ({item['ano_referencia']})")
+    
+    # --- Teste de Fetching BrasilAPI (CNPJ) ---
+    print("\n--- Teste de Fetching BrasilAPI (CNPJ) ---")
+    cnpj_teste = "00000000000191" # CNPJ da Petrobras (exemplo comum)
+    print(f"Buscando CNPJ: {cnpj_teste}")
+    cnpj_data = fetch_cnpj_brasilapi(cnpj_teste)
+    if cnpj_data:
+        print(f"Razão Social: {cnpj_data.get('razao_social')}")
+        print(f"Situação Cadastral: {cnpj_data.get('situacao_cadastral')}")
+    
+    # Simulação de limite de taxa
+    print("Aguardando 1 segundo para respeitar o limite de taxa...")
+    time.sleep(1)
+    
+    cnpj_invalido = "11111111111111"
+    print(f"Buscando CNPJ inválido: {cnpj_invalido}")
+    fetch_cnpj_brasilapi(cnpj_invalido)
