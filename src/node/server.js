@@ -182,6 +182,224 @@ const mockData = [
             cnae_principal: "Atividades de hospitais",
             porte: "DEMAIS"
         }
+    },
+    // --- Novos Mocks para SP ---
+    {
+        municipio_ibge: 3509007, // Campinas
+        nome_municipio: "Campinas",
+        uf_sigla: "SP",
+        populacao: {
+            municipal: 1213792,
+            uf: 12252023,
+            brasil: 213421037,
+            perc_pop_uf: 9.91,
+            piramide_etaria: [
+                { sexo: "Homens", idade_grupo: "0-4 anos", populacao: 50000 },
+                { sexo: "Mulheres", idade_grupo: "0-4 anos", populacao: 48000 }
+            ]
+        },
+        leitos: {
+            total: 3500,
+            razao_por_mil: 2.88,
+            publico_perc: 45.0,
+            privado_perc: 55.0,
+            benchmarking: {
+                nacional: 2.1,
+                status: "Acima da Média Nacional"
+            }
+        },
+        estabelecimentos: {
+            por_tipo: { "Hospital": 25, "Clínica Especializada": 100, "Ambulatório": 200 },
+            benchmarking_nacional: { "Hospital": 5000, "Clínica Especializada": 10000, "Ambulatório": 20000 }
+        },
+        planos_saude: {
+            beneficiarios: 500000,
+            cobertura_plano_saude_perc: 41.19,
+            benchmarking: {
+                nacional: 25.0,
+                status: "Acima da Média Nacional"
+            }
+        },
+        cnpj_enriquecido: {
+            cnpj: "22222222222222",
+            razao_social: "HOSPITAL CAMPINAS SA",
+            cnae_principal: "Atividades de hospitais",
+            porte: "DEMAIS"
+        }
+    },
+    {
+        municipio_ibge: 3548906, // Santos
+        nome_municipio: "Santos",
+        uf_sigla: "SP",
+        populacao: {
+            municipal: 433991,
+            uf: 12252023,
+            brasil: 213421037,
+            perc_pop_uf: 3.54,
+            piramide_etaria: [
+                { sexo: "Homens", idade_grupo: "0-4 anos", populacao: 15000 },
+                { sexo: "Mulheres", idade_grupo: "0-4 anos", populacao: 14000 }
+            ]
+        },
+        leitos: {
+            total: 1200,
+            razao_por_mil: 2.76,
+            publico_perc: 55.0,
+            privado_perc: 45.0,
+            benchmarking: {
+                nacional: 2.1,
+                status: "Acima da Média Nacional"
+            }
+        },
+        estabelecimentos: {
+            por_tipo: { "Hospital": 15, "Clínica Especializada": 50, "Ambulatório": 100 },
+            benchmarking_nacional: { "Hospital": 5000, "Clínica Especializada": 10000, "Ambulatório": 20000 }
+        },
+        planos_saude: {
+            beneficiarios: 250000,
+            cobertura_plano_saude_perc: 57.60,
+            benchmarking: {
+                nacional: 25.0,
+                status: "Acima da Média Nacional"
+            }
+        },
+        cnpj_enriquecido: {
+            cnpj: "33333333333333",
+            razao_social: "CLINICA SANTOS SA",
+            cnae_principal: "Atividades de clínicas especializadas",
+            porte: "DEMAIS"
+        }
+    },
+    {
+        municipio_ibge: 3552403, // Sorocaba
+        nome_municipio: "Sorocaba",
+        uf_sigla: "SP",
+        populacao: {
+            municipal: 723553,
+            uf: 12252023,
+            brasil: 213421037,
+            perc_pop_uf: 5.91,
+            piramide_etaria: [
+                { sexo: "Homens", idade_grupo: "0-4 anos", populacao: 30000 },
+                { sexo: "Mulheres", idade_grupo: "0-4 anos", populacao: 28000 }
+            ]
+        },
+        leitos: {
+            total: 1800,
+            razao_por_mil: 2.49,
+            publico_perc: 30.0,
+            privado_perc: 70.0,
+            benchmarking: {
+                nacional: 2.1,
+                status: "Acima da Média Nacional"
+            }
+        },
+        estabelecimentos: {
+            por_tipo: { "Hospital": 18, "Clínica Especializada": 60, "Ambulatório": 120 },
+            benchmarking_nacional: { "Hospital": 5000, "Clínica Especializada": 10000, "Ambulatório": 20000 }
+        },
+        planos_saude: {
+            beneficiarios: 300000,
+            cobertura_plano_saude_perc: 41.46,
+            benchmarking: {
+                nacional: 25.0,
+                status: "Acima da Média Nacional"
+            }
+        },
+        cnpj_enriquecido: {
+            cnpj: "44444444444444",
+            razao_social: "HOSPITAL SOROCABA SA",
+            cnae_principal: "Atividades de hospitais",
+            porte: "DEMAIS"
+        }
+    },
+    // --- Novo Mock para RJ ---
+    {
+        municipio_ibge: 3303302, // Niterói
+        nome_municipio: "Niterói",
+        uf_sigla: "RJ",
+        populacao: {
+            municipal: 516986,
+            uf: 16055174,
+            brasil: 213421037,
+            perc_pop_uf: 3.22,
+            piramide_etaria: [
+                { sexo: "Homens", idade_grupo: "0-4 anos", populacao: 12000 },
+                { sexo: "Mulheres", idade_grupo: "0-4 anos", populacao: 11000 }
+            ]
+        },
+        leitos: {
+            total: 1500,
+            razao_por_mil: 2.90,
+            publico_perc: 60.0,
+            privado_perc: 40.0,
+            benchmarking: {
+                nacional: 2.1,
+                status: "Acima da Média Nacional"
+            }
+        },
+        estabelecimentos: {
+            por_tipo: { "Hospital": 10, "Clínica Especializada": 40, "Ambulatório": 80 },
+            benchmarking_nacional: { "Hospital": 5000, "Clínica Especializada": 10000, "Ambulatório": 20000 }
+        },
+        planos_saude: {
+            beneficiarios: 350000,
+            cobertura_plano_saude_perc: 67.70,
+            benchmarking: {
+                nacional: 25.0,
+                status: "Acima da Média Nacional"
+            }
+        },
+        cnpj_enriquecido: {
+            cnpj: "55555555555555",
+            razao_social: "CLINICA NITEROI SA",
+            cnae_principal: "Atividades de clínicas especializadas",
+            porte: "DEMAIS"
+        }
+    },
+    // --- Novo Mock para MG ---
+    {
+        municipio_ibge: 3106200, // Belo Horizonte
+        nome_municipio: "Belo Horizonte",
+        uf_sigla: "MG",
+        populacao: {
+            municipal: 2530701,
+            uf: 21168791,
+            brasil: 213421037,
+            perc_pop_uf: 11.95,
+            piramide_etaria: [
+                { sexo: "Homens", idade_grupo: "0-4 anos", populacao: 100000 },
+                { sexo: "Mulheres", idade_grupo: "0-4 anos", populacao: 95000 }
+            ]
+        },
+        leitos: {
+            total: 6000,
+            razao_por_mil: 2.37,
+            publico_perc: 40.0,
+            privado_perc: 60.0,
+            benchmarking: {
+                nacional: 2.1,
+                status: "Acima da Média Nacional"
+            }
+        },
+        estabelecimentos: {
+            por_tipo: { "Hospital": 50, "Clínica Especializada": 200, "Ambulatório": 400 },
+            benchmarking_nacional: { "Hospital": 5000, "Clínica Especializada": 10000, "Ambulatório": 20000 }
+        },
+        planos_saude: {
+            beneficiarios: 1500000,
+            cobertura_plano_saude_perc: 59.27,
+            benchmarking: {
+                nacional: 25.0,
+                status: "Acima da Média Nacional"
+            }
+        },
+        cnpj_enriquecido: {
+            cnpj: "66666666666666",
+            razao_social: "HOSPITAL BELO HORIZONTE SA",
+            cnae_principal: "Atividades de hospitais",
+            porte: "DEMAIS"
+        }
     }
 ];
 
