@@ -144,6 +144,127 @@ def fetch_ibge_populacao_municipal(periodo: str = "-1") -> Optional[list]:
         print(f"Erro inesperado ao processar dados do IBGE: {e}")
         return None
 
+# --- Fetcher IBGE (População por UF) ---
+def fetch_ibge_populacao_uf(periodo: str = "-1") -> Optional[dict]:
+    """
+    Busca a população residente estimada para todas as Unidades da Federação.
+    """
+    url = f"{IBGE_API_URL}/6579/periodos/{periodo}/variaveis/9324?localidades=N3[all]"
+    headers = {"User-Agent": "HM-ITool/1.0"}
+    try:
+        r = requests.get(url, headers=headers, timeout=30)
+        r.raise_for_status()
+        data = r.json()
+        if not data or not data[0].get("resultados"):
+            return None
+        
+        populacao_uf = {}
+        for resultado in data[0]["resultados"]:
+            for serie in resultado["series"]:
+                # O IBGE retorna o nome da UF no formato "São Paulo (SP)" quando a localidade é N3.
+                # A sigla da UF é o que está entre parênteses.
+                match = re.search(r'\((.*?)\)', serie["localidade"]["nome"])
+                if match:
+                    uf_sigla = match.group(1)
+                else:
+                    # Fallback: usar o nome completo se a extração falhar (o que causou o erro anterior)
+                    uf_sigla = serie["localidade"]["nome"][:2] # Apenas para evitar erro, mas o formato é esperado.
+                valor_populacao = list(serie["serie"].values())[0]
+                if valor_populacao != "...":
+                    populacao_uf[uf_sigla] = int(valor_populacao)
+        return populacao_uf
+    except Exception as e:
+        print(f"Erro ao buscar população por UF: {e}")
+        return None
+
+# --- Fetcher IBGE (População Brasil) ---
+def fetch_ibge_populacao_brasil(periodo: str = "-1") -> Optional[int]:
+    """
+    Busca a população residente estimada para o Brasil.
+    """
+    url = f"{IBGE_API_URL}/6579/periodos/{periodo}/variaveis/9324?localidades=N1[1]"
+    headers = {"User-Agent": "HM-ITool/1.0"}
+    try:
+        r = requests.get(url, headers=headers, timeout=30)
+        r.raise_for_status()
+        data = r.json()
+        if not data or not data[0].get("resultados"):
+            return None
+        
+        valor_populacao = list(data[0]["resultados"][0]["series"][0]["serie"].values())[0]
+        return int(valor_populacao) if valor_populacao != "..." else None
+    except Exception as e:
+        print(f"Erro ao buscar população do Brasil: {e}")
+        return None
+
+# --- Fetcher IBGE (Pirâmide Etária por Município) ---
+def fetch_ibge_piramide_etaria(codigo_ibge: str) -> Optional[list]:
+    """
+    Busca a população residente por sexo e idade para um município (Tabela 7360 - Projeção da População).
+    
+    :param codigo_ibge: Código IBGE do município (7 dígitos).
+    :return: Lista de dicionários com os dados da pirâmide etária ou None.
+    """
+    # Tabela 7360: População residente por sexo e idade
+    # Variável 7360: População residente
+    # Classificação 7169: Sexo (1=Total, 2=Homens, 3=Mulheres)
+    # Classificação 7170: Idade (grupos de idade)
+    # Período: -1 (Mais recente)
+    url = f"{IBGE_API_URL}/7360/periodos/-1/variaveis/7360?localidades=N6[{codigo_ibge}]&classificadores=7169[2,3]|7170[all]"
+    headers = {"User-Agent": "HM-ITool/1.0"}
+    
+    try:
+        r = requests.get(url, headers=headers, timeout=30)
+        r.raise_for_status()
+        data = r.json()
+        
+        if not data or not data[0].get('resultados'):
+            print(f"Aviso: Dados da pirâmide etária para {codigo_ibge} não encontrados.")
+            return None
+            
+        piramide_data = []
+        # O primeiro elemento da lista é o cabeçalho, ignoramos
+        for item in data[1:]:
+            sexo = item['classificacao'][0]['categoria']['7169']
+            idade = item['classificacao'][1]['categoria']['7170']
+            valor = int(item['resultados'][0]['series'][0]['valor'])
+            
+            piramide_data.append({
+                'sexo': sexo['nome'],
+                'idade_grupo': idade['nome'],
+                'populacao': valor
+            })
+            
+        print(f"Sucesso ao buscar pirâmide etária para {codigo_ibge}. {len(piramide_data)} grupos encontrados.")
+        return piramide_data
+        
+    except requests.exceptions.RequestException as e:
+        print(f"Erro ao buscar pirâmide etária: {e}")
+        return None
+    except Exception as e:
+        print(f"Erro inesperado ao processar pirâmide etária: {e}")
+        return None
+
+# --- 11.5 Python: Fetcher BrasilAPI (CNPJ) ---
+def fetch_ibge_populacao_brasil(periodo: str = "-1") -> Optional[int]:
+    """
+    Busca a população residente estimada para o Brasil.
+    """
+    url = f"{IBGE_API_URL}/6579/periodos/{periodo}/variaveis/9324?localidades=N1[1]"
+    headers = {"User-Agent": "HM-ITool/1.0"}
+    try:
+        r = requests.get(url, headers=headers, timeout=30)
+        r.raise_for_status()
+        data = r.json()
+        if not data or not data[0].get("resultados"):
+            return None
+        
+        valor_populacao = list(data[0]["resultados"][0]["series"][0]["serie"].values())[0]
+        return int(valor_populacao) if valor_populacao != "..." else None
+    except Exception as e:
+        print(f"Erro ao buscar população do Brasil: {e}")
+        return None
+
 # --- 11.5 Python: Fetcher BrasilAPI (CNPJ) ---
 def fetch_cnpj_brasilapi(cnpj: str) -> Optional[dict]:
     """
@@ -163,6 +284,7 @@ def fetch_cnpj_brasilapi(cnpj: str) -> Optional[dict]:
         
         if r.status_code == 200:
             print(f"Sucesso ao buscar CNPJ {cnpj}.")
+            # Retorna dados brutos, a transformação/seleção de campos será feita na lógica de ETL
             return data
         else:
             print(f"Erro ao buscar CNPJ {cnpj}: {data.get('message', 'Erro desconhecido')}")
@@ -178,6 +300,134 @@ def fetch_cnpj_brasilapi(cnpj: str) -> Optional[dict]:
     except requests.exceptions.RequestException as e:
         print(f"Erro de conexão ao buscar CNPJ {cnpj}: {e}")
         return None
+
+# --- Simulação de Dados de Benchmarking e Leitos ---
+# Em um ETL real, estes dados viriam de arquivos processados (CNES, ANS)
+# Para fins de PoC, usaremos dados mockados para o cálculo de métricas.
+
+# Dados de Leitos (Mock) - Total de leitos, % público, % privado
+LEITOS_MOCK = {
+    "3549904": {"total": 1500, "publico_perc": 35.0, "privado_perc": 65.0, "estabelecimentos": {"Hospital": 10, "Clínica Especializada": 25, "Ambulatório": 50}}, # SJC
+    "3550308": {"total": 25000, "publico_perc": 40.0, "privado_perc": 60.0, "estabelecimentos": {"Hospital": 150, "Clínica Especializada": 500, "Ambulatório": 1000}}, # SP
+    "3304557": {"total": 18000, "publico_perc": 50.0, "privado_perc": 50.0, "estabelecimentos": {"Hospital": 120, "Clínica Especializada": 400, "Ambulatório": 800}}, # RJ
+}
+
+# Dados de Planos de Saúde (Mock) - Beneficiários
+PLANOS_SAUDE_MOCK = {
+    "3549904": 350000, # SJC
+    "3550308": 10000000, # SP
+    "3304557": 6000000, # RJ
+}
+
+# Benchmarking Nacional (Mock)
+BENCHMARK_NACIONAL = {
+    "razao_leitos_por_mil": 2.1,
+    "leitos_publicos_perc": 45.0,
+    "leitos_privados_perc": 55.0,
+    "cobertura_plano_saude_perc": 25.0,
+    "estabelecimentos_por_tipo": {"Hospital": 5000, "Clínica Especializada": 10000, "Ambulatório": 20000},
+}
+
+# --- Lógica Principal de ETL/Cálculo ---
+def process_market_intelligence(codigo_ibge: str, uf_sigla: str) -> Optional[dict]:
+    """
+    Processa e calcula todas as métricas de inteligência de mercado para um município.
+    
+    :param codigo_ibge: Código IBGE do município (7 dígitos).
+    :param uf_sigla: Sigla da Unidade da Federação.
+    :return: Dicionário com todas as métricas calculadas.
+    """
+    
+    # 1. Fetching de Dados Brutos
+    pop_municipal_data = fetch_ibge_populacao_municipal()
+    pop_uf_data = fetch_ibge_populacao_uf()
+    pop_brasil = fetch_ibge_populacao_brasil()
+    piramide_etaria = fetch_ibge_piramide_etaria(codigo_ibge)
+    
+    # 2. Extração de Dados do Município
+    pop_municipio = next((item['populacao_estimada'] for item in pop_municipal_data if item['codigo_ibge'] == codigo_ibge), None)
+    
+    if not pop_municipio or not pop_uf_data or not pop_brasil:
+        print(f"Erro: Dados básicos de população não encontrados para {codigo_ibge}.")
+        return None
+
+    pop_uf = pop_uf_data.get(uf_sigla)
+    
+    # 3. Simulação de Dados de Leitos e Planos de Saúde
+    leitos_data = LEITOS_MOCK.get(codigo_ibge, {"total": 0, "publico_perc": 0, "privado_perc": 0, "estabelecimentos": {}})
+    planos_saude_beneficiarios = PLANOS_SAUDE_MOCK.get(codigo_ibge, 0)
+    
+    # 4. Cálculo das Métricas
+    
+    # População
+    perc_pop_uf = (pop_municipio / pop_uf) * 100 if pop_uf else 0
+    
+    # Leitos
+    razao_leitos_por_mil = (leitos_data["total"] / pop_municipio) * 1000 if pop_municipio else 0
+    
+    # Planos de Saúde
+    cobertura_plano_saude_perc = (planos_saude_beneficiarios / pop_municipio) * 100 if pop_municipio else 0
+    
+    # Benchmarking (Mock)
+    bench_leitos_nacional = BENCHMARK_NACIONAL["razao_leitos_por_mil"]
+    bench_cobertura_nacional = BENCHMARK_NACIONAL["cobertura_plano_saude_perc"]
+    
+    # 5. Estruturação do Resultado
+    
+    # Simulação de enriquecimento CNPJ (para o mock da API)
+    cnpj_mock = fetch_cnpj_brasilapi("00000000000191") # Exemplo
+    cnpj_enriquecido = {
+        "cnpj": "00000000000191",
+        "razao_social": cnpj_mock.get('razao_social', 'N/A'),
+        "cnae_principal": cnpj_mock.get('cnae_fiscal_descricao', 'N/A'),
+        "porte": cnpj_mock.get('porte', 'N/A'),
+    } if cnpj_mock else None
+    
+    return {
+        "municipio_ibge": codigo_ibge,
+        "nome_municipio": next((item['nome_municipio'] for item in pop_municipal_data if item['codigo_ibge'] == codigo_ibge), "N/A"),
+        "uf_sigla": uf_sigla,
+        
+        # População e Benchmarking
+        "populacao": {
+            "municipal": pop_municipio,
+            "uf": pop_uf,
+            "brasil": pop_brasil,
+            "perc_pop_uf": round(perc_pop_uf, 2),
+            "piramide_etaria": piramide_etaria,
+        },
+        
+        # Leitos e Benchmarking
+        "leitos": {
+            "total": leitos_data["total"],
+            "razao_por_mil": round(razao_leitos_por_mil, 2),
+            "publico_perc": leitos_data["publico_perc"],
+            "privado_perc": leitos_data["privado_perc"],
+            "benchmarking": {
+                "nacional": bench_leitos_nacional,
+                "status": "Acima da Média Nacional" if razao_leitos_por_mil > bench_leitos_nacional else "Abaixo da Média Nacional"
+            }
+        },
+        
+        # Estabelecimentos
+        "estabelecimentos": {
+            "por_tipo": leitos_data["estabelecimentos"],
+            "benchmarking_nacional": BENCHMARK_NACIONAL["estabelecimentos_por_tipo"] # Mock
+        },
+        
+        # Planos de Saúde
+        "planos_saude": {
+            "beneficiarios": planos_saude_beneficiarios,
+            "cobertura_plano_saude_perc": round(cobertura_plano_saude_perc, 2),
+            "benchmarking": {
+                "nacional": bench_cobertura_nacional,
+                "status": "Acima da Média Nacional" if cobertura_plano_saude_perc > bench_cobertura_nacional else "Abaixo da Média Nacional"
+            }
+        },
+        
+        # Enriquecimento de CNPJ (Melhorado)
+        "cnpj_enriquecido": cnpj_enriquecido
+    }
 
 # --- Exemplo de uso (para teste) ---
 if __name__ == "__main__":
@@ -216,14 +466,15 @@ if __name__ == "__main__":
         for item in populacao_data[:5]:
             print(f"  {item['nome_municipio']} ({item['codigo_ibge']}): {item['populacao_estimada']:,} hab. ({item['ano_referencia']})")
     
-    # --- Teste de Fetching BrasilAPI (CNPJ) ---
-    print("\n--- Teste de Fetching BrasilAPI (CNPJ) ---")
+    # --- Teste de    # 5. Fetching BrasilAPI (CNPJ)
+    print("\n--- 5. Teste de Fetching BrasilAPI (CNPJ) ---")
     cnpj_teste = "00000000000191" # CNPJ da Petrobras (exemplo comum)
     print(f"Buscando CNPJ: {cnpj_teste}")
     cnpj_data = fetch_cnpj_brasilapi(cnpj_teste)
     if cnpj_data:
         print(f"Razão Social: {cnpj_data.get('razao_social')}")
-        print(f"Situação Cadastral: {cnpj_data.get('situacao_cadastral')}")
+        print(f"CNAE Principal: {cnpj_data.get('cnae_fiscal_descricao')}")
+        print(f"Porte: {cnpj_data.get('porte')}")
     
     # Simulação de limite de taxa
     print("Aguardando 1 segundo para respeitar o limite de taxa...")
@@ -232,3 +483,40 @@ if __name__ == "__main__":
     cnpj_invalido = "11111111111111"
     print(f"Buscando CNPJ inválido: {cnpj_invalido}")
     fetch_cnpj_brasilapi(cnpj_invalido)
+    
+    # 6. Teste de Fetching IBGE (População UF e Brasil)
+    print("\n--- 6. Teste de Fetching IBGE (População UF e Brasil) ---")
+    
+    pop_brasil = fetch_ibge_populacao_brasil()
+    print(f"População Estimada Brasil: {pop_brasil:,} hab.")
+    
+    pop_uf = fetch_ibge_populacao_uf()
+    if pop_uf:
+        print(f"População Estimada SP: {pop_uf.get('SP', 'N/A')} hab.")
+        print(f"População Estimada RJ: {pop_uf.get('RJ', 'N/A')} hab.")
+    else:
+        print("Falha ao buscar população por UF.")
+        
+    # 7. Teste de Processamento de Inteligência de Mercado
+    print("\n--- 7. Teste de Processamento de Inteligência de Mercado ---")
+    # Código IBGE de São José dos Campos: 3549904
+    codigo_sjc = "3549904"
+    uf_sjc = "SP"
+    
+    dados_inteligencia = process_market_intelligence(codigo_sjc, uf_sjc)
+    
+    if dados_inteligencia:
+        print(f"Dados de Inteligência para {dados_inteligencia['nome_municipio']} ({dados_inteligencia['uf_sigla']}):")
+        print(f"  População Municipal: {dados_inteligencia['populacao']['municipal']:,} hab.")
+        print(f"  % População UF: {dados_inteligencia['populacao']['perc_pop_uf']}%")
+        print(f"  Razão Leitos/1000 hab: {dados_inteligencia['leitos']['razao_por_mil']}")
+        print(f"  Benchmarking Leitos Nacional: {dados_inteligencia['leitos']['benchmarking']['status']}")
+        print(f"  Cobertura Plano de Saúde: {dados_inteligencia['planos_saude']['cobertura_plano_saude_perc']}%")
+        print(f"  Enriquecimento CNPJ (CNAE): {dados_inteligencia['cnpj_enriquecido']['cnae_principal']}")
+        piramide = dados_inteligencia['populacao']['piramide_etaria']
+        if piramide:
+            print(f"  Primeiros 5 grupos da Pirâmide Etária:")
+            for item in piramide[:5]:
+                print(f"    {item['idade_grupo']} ({item['sexo']}): {item['populacao']:,} pessoas")
+        else:
+            print("  Pirâmide Etária: Dados indisponíveis.")
