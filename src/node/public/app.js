@@ -115,17 +115,17 @@ function exibirResultados(dados, municipioNome) {
     // Calcular percentual de população em relação ao Brasil
     const percPopBrasil = ((pop.municipal / pop.brasil) * 100).toFixed(2);
     
-    // Calcular índice de envelhecimento (simplificado)
-    const idosos = pop.piramide_etaria.filter(p => p.idade_grupo.includes('60') || p.idade_grupo.includes('65') || p.idade_grupo.includes('70')).reduce((sum, p) => sum + p.populacao, 0);
-    const criancas = pop.piramide_etaria.filter(p => p.idade_grupo.includes('0-4') || p.idade_grupo.includes('5-9')).reduce((sum, p) => sum + p.populacao, 0);
-    const indiceEnvelhecimento = criancas > 0 ? ((idosos / criancas) * 100).toFixed(2) : 'N/A';
+    // Novos Índices Demográficos
+    const indices = pop.indices_demograficos || {};
+    const idososPorPea = indices.idosos_por_pea || 'N/A';
+    const criancasPorPea = indices.criancas_por_pea || 'N/A';
     
     const html = `
         <div class="resultado-item">
             <h3>${municipioNome}</h3>
             <p><strong>Código IBGE:</strong> ${dados.municipio_ibge} | <strong>Estado:</strong> ${dados.uf_sigla}</p>
             
-            <!-- SEÇÃO: POPULAÇÃO E BENCHMARKING -->
+            <!-- SEÇÃO: POPULAÇÃO E DADOS DEMOGRÁFICOS -->
             <div style="margin-top: 25px; padding: 20px; background: #f0f4ff; border-radius: 8px; border-left: 5px solid #667eea;">
                 <h4 style="color: #667eea; margin-bottom: 15px;">📊 POPULAÇÃO E DADOS DEMOGRÁFICOS</h4>
                 
@@ -143,28 +143,34 @@ function exibirResultados(dados, municipioNome) {
                     </div>
                     
                     <div class="resultado-card">
-                        <h4>Índice de Envelhecimento</h4>
-                        <p>${indiceEnvelhecimento}</p>
-                        <small style="color: #999;">Idosos / Crianças</small>
+                        <h4>Idosos / PEA</h4>
+                        <p>${idososPorPea}%</p>
+                        <small style="color: #999;">Razão de Dependência</small>
+                    </div>
+                    
+                    <div class="resultado-card">
+                        <h4>Crianças / PEA</h4>
+                        <p>${criancasPorPea}%</p>
+                        <small style="color: #999;">Razão de Dependência</small>
                     </div>
                 </div>
                 
                 <div style="margin-top: 15px; padding: 15px; background: white; border-radius: 6px;">
-                    <h5 style="color: #333; margin-bottom: 10px;">Pirâmide Etária (Amostra)</h5>
-                    <table style="width: 100%; font-size: 0.9em;">
+                    <h5 style="color: #333; margin-bottom: 10px;">Pirâmide Etária Completa</h5>
+                    <table style="width: 100%; font-size: 0.85em; border-collapse: collapse;">
                         <tr style="background: #f5f5f5;">
-                            <th style="text-align: left; padding: 8px;">Faixa Etária</th>
-                            <th style="text-align: center; padding: 8px;">Homens</th>
-                            <th style="text-align: center; padding: 8px;">Mulheres</th>
+                            <th style="text-align: left; padding: 8px; border: 1px solid #ddd;">Faixa Etária</th>
+                            <th style="text-align: center; padding: 8px; border: 1px solid #ddd;">Homens</th>
+                            <th style="text-align: center; padding: 8px; border: 1px solid #ddd;">Mulheres</th>
                         </tr>
-                        ${pop.piramide_etaria.slice(0, 6).map((item, idx) => {
-                            if (idx % 2 === 0) {
+                        ${pop.piramide_etaria.map((item, idx) => {
+                            if (item.sexo === 'Homens') {
                                 const mulheres = pop.piramide_etaria[idx + 1];
                                 return `
-                                    <tr>
-                                        <td style="padding: 8px;">${item.idade_grupo}</td>
-                                        <td style="text-align: center; padding: 8px;">${item.populacao.toLocaleString('pt-BR')}</td>
-                                        <td style="text-align: center; padding: 8px;">${mulheres ? mulheres.populacao.toLocaleString('pt-BR') : 'N/A'}</td>
+                                    <tr style="border-bottom: 1px solid #e0e0e0;">
+                                        <td style="padding: 8px; border: 1px solid #ddd;">${item.idade_grupo}</td>
+                                        <td style="text-align: center; padding: 8px; border: 1px solid #ddd;">${item.populacao.toLocaleString('pt-BR')}</td>
+                                        <td style="text-align: center; padding: 8px; border: 1px solid #ddd;">${mulheres ? mulheres.populacao.toLocaleString('pt-BR') : 'N/A'}</td>
                                     </tr>
                                 `;
                             }
@@ -215,6 +221,35 @@ function exibirResultados(dados, municipioNome) {
                 </div>
             </div>
             
+            <!-- SEÇÃO: TOP 5 MAIORES ESTABELECIMENTOS -->
+            <div style="margin-top: 25px; padding: 20px; background: #fef3e0; border-radius: 8px; border-left: 5px solid #ff6f00;">
+                <h4 style="color: #ff6f00; margin-bottom: 15px;">🏢 TOP 5 MAIORES ESTABELECIMENTOS (POR LEITOS)</h4>
+                
+                ${estabelecimentos.top_5_leitos && estabelecimentos.top_5_leitos.length > 0 ? `
+                    <table style="width: 100%; font-size: 0.9em; margin-bottom: 15px;">
+                        <tr style="background: #ffe0b2;">
+                            <th style="text-align: left; padding: 10px;">Estabelecimento</th>
+                            <th style="text-align: center; padding: 10px;">Leitos</th>
+                            <th style="text-align: center; padding: 10px;">Natureza</th>
+                        </tr>
+                        ${estabelecimentos.top_5_leitos.map(est => `
+                            <tr style="border-bottom: 1px solid #e0e0e0;">
+                                <td style="padding: 10px;">${est.nome}</td>
+                                <td style="text-align: center; padding: 10px;"><strong>${est.leitos}</strong></td>
+                                <td style="text-align: center; padding: 10px;">
+                                    <span style="padding: 4px 8px; border-radius: 4px; font-size: 0.85em; 
+                                        ${est.natureza === 'Público' ? 'background: #4caf50; color: white;' : 
+                                          est.natureza === 'Privado' ? 'background: #2196f3; color: white;' : 
+                                          'background: #ff9800; color: white;'}">
+                                        ${est.natureza}
+                                    </span>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </table>
+                ` : '<p>Dados de estabelecimentos não disponíveis.</p>'}
+            </div>
+            
             <!-- SEÇÃO: ESTABELECIMENTOS DE SAÚDE -->
             <div style="margin-top: 25px; padding: 20px; background: #f0fff4; border-radius: 8px; border-left: 5px solid #4caf50;">
                 <h4 style="color: #4caf50; margin-bottom: 15px;">🏢 ESTABELECIMENTOS DE SAÚDE</h4>
@@ -223,7 +258,7 @@ function exibirResultados(dados, municipioNome) {
                     <tr style="background: #e8f5e9;">
                         <th style="text-align: left; padding: 10px;">Tipo de Estabelecimento</th>
                         <th style="text-align: center; padding: 10px;">Local</th>
-                        <th style="text-align: center; padding: 10px;">Nacional (Benchmark)</th>
+                        <th style="text-align: center; padding: 10px;">Benchmarking Nacional</th>
                     </tr>
                     ${Object.entries(estabelecimentos.por_tipo).map(([tipo, qtd]) => `
                         <tr style="border-bottom: 1px solid #e0e0e0;">
@@ -301,4 +336,6 @@ function mostrarErro(mensagem) {
 // Inicializar a página
 document.addEventListener('DOMContentLoaded', function() {
     inicializarEstados();
+    municipioSelect.disabled = true;
+    buscarBtn.disabled = true;
 });
