@@ -1,9 +1,13 @@
 const express = require('express');
+const path = require('path');
 const app = express();
 const PORT = 3000;
 
 // Middleware para parsear JSON
 app.use(express.json());
+
+// Servir arquivos estáticos (HTML, CSS, JS)
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Simulação de dados processados pelo Python
 const mockData = [
@@ -53,12 +57,13 @@ app.get('/api/v1/market-intelligence/:ibge_code', (req, res) => {
     }
 });
 
-// Endpoint raiz
+// Endpoint raiz (serve o index.html)
 app.get('/', (req, res) => {
-    res.send('HM-I Tool API está rodando. Tente /api/v1/market-intelligence/3549904');
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Inicia o servidor
 app.listen(PORT, () => {
     console.log(`HM-I Tool API rodando em http://localhost:${PORT}`);
+    console.log(`Acesse http://localhost:${PORT}/ para usar a interface web.`);
 });
