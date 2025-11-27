@@ -1,11 +1,11 @@
 // Dados de estados e cidades brasileiras (simplificado para exemplo)
-// Em um projeto real, isso viria do backend ou de uma API
+// ESTA LISTA FOI RESTRITA PARA INCLUIR APENAS CIDADES COM DADOS MOCKADOS NO BACKEND (server.js)
 const estadosCidades = {
     'SP': {
         nome: 'São Paulo',
         cidades: [
-            { nome: 'São Paulo', ibge: 3550308 },
             { nome: 'São José dos Campos', ibge: 3549904 },
+            { nome: 'São Paulo', ibge: 3550308 },
             { nome: 'Campinas', ibge: 3509007 },
             { nome: 'Santos', ibge: 3548906 },
             { nome: 'Sorocaba', ibge: 3552403 }
@@ -15,40 +15,13 @@ const estadosCidades = {
         nome: 'Rio de Janeiro',
         cidades: [
             { nome: 'Rio de Janeiro', ibge: 3304557 },
-            { nome: 'Niterói', ibge: 3303302 },
-            { nome: 'Duque de Caxias', ibge: 3301702 },
-            { nome: 'Nova Iguaçu', ibge: 3303500 },
-            { nome: 'São Gonçalo', ibge: 3304144 }
+            { nome: 'Niterói', ibge: 3303302 }
         ]
     },
     'MG': {
         nome: 'Minas Gerais',
         cidades: [
-            { nome: 'Belo Horizonte', ibge: 3106200 },
-            { nome: 'Uberlândia', ibge: 3170206 },
-            { nome: 'Contagem', ibge: 3115200 },
-            { nome: 'Juiz de Fora', ibge: 3132404 },
-            { nome: 'Montes Claros', ibge: 3143302 }
-        ]
-    },
-    'BA': {
-        nome: 'Bahia',
-        cidades: [
-            { nome: 'Salvador', ibge: 2927408 },
-            { nome: 'Feira de Santana', ibge: 2910800 },
-            { nome: 'Vitória da Conquista', ibge: 2933801 },
-            { nome: 'Camaçari', ibge: 2904202 },
-            { nome: 'Ilhéus', ibge: 2915200 }
-        ]
-    },
-    'RS': {
-        nome: 'Rio Grande do Sul',
-        cidades: [
-            { nome: 'Porto Alegre', ibge: 4314902 },
-            { nome: 'Caxias do Sul', ibge: 4305108 },
-            { nome: 'Pelotas', ibge: 4314407 },
-            { nome: 'Santa Maria', ibge: 4316907 },
-            { nome: 'Novo Hamburgo', ibge: 4313409 }
+            { nome: 'Belo Horizonte', ibge: 3106200 }
         ]
     }
 };
