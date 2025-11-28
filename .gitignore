@@ -10,3 +10,4 @@ src/node/package-lock.json
 # Logs and other files
 *.log
 *.zip
+.env

@@ -905,3 +905,65 @@ app.get('/api/v1/cities', (req, res) => {
 app.listen(port, () => {
     console.log(`HM-I Tool API rodando em http://localhost:${port}`);
 });
+
+
+// Endpoint para obter dados de inteligência de mercado
+app.get("/api/v1/analysis/:ibge_code", async (req, res) => {
+    const ibgeCode = parseInt(req.params.ibge_code);
+    const data = mockData.find(data => data.municipio_ibge === ibgeCode);
+
+    if (!data) {
+        return res.status(404).json({ status: "error", message: `Dados não encontrados para o código IBGE: ${ibgeCode}` });
+    }
+
+    // Formatar os dados para o prompt
+    const promptData = JSON.stringify(data, null, 2);
+
+    const prompt = `
+        Você é um analista de mercado de saúde sênior. Sua tarefa é analisar os dados de inteligência de mercado a seguir para a cidade de ${data.nome_municipio} e gerar uma análise concisa de Prós e Contras para um potencial investimento no setor de saúde local.
+
+        Dados de Inteligência de Mercado:
+        ${promptData}
+
+        A análise deve ser estruturada em duas seções: "Prós (Oportunidades)" e "Contras (Desafios)".
+        Use uma linguagem profissional e destaque os pontos mais críticos de cada seção.
+        A resposta deve ser um objeto JSON no seguinte formato:
+        {
+            "pros": [
+                "Ponto 1 (Ex: Alta cobertura de planos de saúde)",
+                "Ponto 2 (Ex: Salário médio acima da média nacional)"
+            ],
+            "contras": [
+                "Ponto 1 (Ex: Razão de leitos abaixo da média nacional)",
+                "Ponto 2 (Ex: Alta dependência de idosos)"
+            ]
+        }
+    `;
+
+    try {
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini", // Modelo rápido e eficiente para esta tarefa
+            messages: [
+                { role: "system", content: "Você é um analista de mercado de saúde sênior que gera análises concisas em formato JSON." },
+                { role: "user", content: prompt }
+            ],
+            response_format: { type: "json_object" },
+        });
+
+        const analysis = JSON.parse(completion.choices[0].message.content);
+
+        res.json({
+            status: "success",
+            analysis: analysis,
+            message: "Análise de Prós e Contras gerada pela OpenAI."
+        });
+
+    } catch (error) {
+        console.error("Erro ao chamar a OpenAI:", error);
+        res.status(500).json({
+            status: "error",
+            message: "Erro ao gerar análise com a OpenAI. Verifique a chave API e o log do servidor.",
+            details: error.message
+        });
+    }
+});
