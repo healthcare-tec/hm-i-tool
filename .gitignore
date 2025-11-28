@@ -1,1 +1,12 @@
-node_modules/\n.venv/\n__pycache__/\n*.pyc\n/data/\n
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Node.js
+src/node/node_modules/
+src/node/package-lock.json
+
+# Logs and other files
+*.log
+*.zip
