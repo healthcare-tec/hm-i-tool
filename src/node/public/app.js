@@ -293,9 +293,40 @@ function exibirResultados(dados, municipioNome) {
                 </div>
             </div>
             
+            <!-- SEÇÃO: MERCADO DE TRABALHO E EMPRESAS -->
+            <div style="margin-top: 25px; padding: 20px; background: #e0f7fa; border-radius: 8px; border-left: 5px solid #00bcd4;">
+                <h4 style="color: #00bcd4; margin-bottom: 15px;">💼 MERCADO DE TRABALHO E EMPRESAS (CAGED)</h4>
+                
+                <div class="resultado-grid">
+                    <div class="resultado-card" style="background: #e0f7fa; border-left-color: #00bcd4;">
+                        <h4>Total de Empresas</h4>
+                        <p>${dados.mercado_trabalho.empresas_total.toLocaleString('pt-BR')}</p>
+                        <small style="color: #999;">% na UF: ${dados.mercado_trabalho.perc_empresas_uf.toFixed(2)}%</small>
+                    </div>
+                    
+                    <div class="resultado-card" style="background: #e0f7fa; border-left-color: #00bcd4;">
+                        <h4>Estoque de Empregos</h4>
+                        <p>${dados.mercado_trabalho.estoque_empregos.toLocaleString('pt-BR')}</p>
+                        <small style="color: #999;">Saldo Mês: ${dados.mercado_trabalho.saldo_empregos_mes.toLocaleString('pt-BR')} (${dados.mercado_trabalho.benchmarking.status_tendencia})</small>
+                    </div>
+                    
+                    <div class="resultado-card" style="background: #e0f7fa; border-left-color: #00bcd4;">
+                        <h4>Salário Médio Admissão</h4>
+                        <p>R$ ${dados.mercado_trabalho.salario_medio_admissao.toFixed(2).replace('.', ',')}</p>
+                        <small style="color: #999;">Status: ${dados.mercado_trabalho.benchmarking.status_salario}</small>
+                    </div>
+                    
+                    <div class="resultado-card" style="background: #e0f7fa; border-left-color: #00bcd4;">
+                        <h4>Taxa de Desemprego (Mock)</h4>
+                        <p>${dados.mercado_trabalho.taxa_desemprego.toFixed(2)}%</p>
+                        <small style="color: #999;">Status: ${dados.mercado_trabalho.benchmarking.status_desemprego}</small>
+                    </div>
+                </div>
+            </div>
+            
             <!-- SEÇÃO: ENRIQUECIMENTO CNPJ -->
             <div style="margin-top: 25px; padding: 20px; background: #f3e5f5; border-radius: 8px; border-left: 5px solid #9c27b0;">
-                <h4 style="color: #9c27b0; margin-bottom: 15px;">🏢 ENRIQUECIMENTO DE DADOS (CNPJ)</h4>
+                <h4 style="color: #9c27b0; margin-bottom: 15px;">🏢 ENRIQUECIMENTO CNPJ DE EXEMPLO</h4>
                 
                 ${cnpj ? `
                     <table style="width: 100%; font-size: 0.9em;">

@@ -302,6 +302,78 @@ def fetch_cnpj_brasilapi(cnpj: str) -> Optional[dict]:
         return None
 
 # --- Simulação de Dados de Benchmarking e Leitos ---
+# Em um ETL real, estes dados viriam de arquivos processados (CNES, ANS, CAGED, Mapa de Empresas)
+# Para fins de PoC, usaremos dados mockados para o cálculo de métricas.
+
+# Dados de Mercado de Trabalho (CAGED) e Empresas (Mock)
+MERCADO_TRABALHO_MOCK = {
+    "3549904": { # SJC
+        "salario_medio_admissao": 2850.50,
+        "estoque_empregos": 350000,
+        "saldo_empregos_mes": 1500,
+        "taxa_desemprego": 6.5,
+        "empresas_total": 45000,
+        "perc_empresas_uf": 4.5,
+    },
+    "3550308": { # SP
+        "salario_medio_admissao": 3500.00,
+        "estoque_empregos": 5000000,
+        "saldo_empregos_mes": 15000,
+        "taxa_desemprego": 8.0,
+        "empresas_total": 500000,
+        "perc_empresas_uf": 50.0,
+    },
+    "3304557": { # RJ
+        "salario_medio_admissao": 3100.00,
+        "estoque_empregos": 2500000,
+        "saldo_empregos_mes": 5000,
+        "taxa_desemprego": 9.5,
+        "empresas_total": 200000,
+        "perc_empresas_uf": 30.0,
+    },
+}
+
+# Benchmarking Nacional (Mock)
+BENCHMARK_NACIONAL = {
+    "razao_leitos_por_mil": 2.1,
+    "cobertura_plano_saude_perc": 25.0,
+    "salario_medio_admissao": 2500.00,
+    "taxa_desemprego": 8.5,
+    "estabelecimentos_por_tipo": {
+        "Hospital": 5000,
+        "Clínica Especializada": 10000,
+        "Ambulatório": 20000
+    }
+}
+
+# Dados de Leitos (Mock) - Top 5 Estabelecimentos por Leitos
+# Em um ETL real, estes dados viriam de arquivos processados (CNES, ANS)
+# Para fins de PoC, usaremos dados mockados para o cálculo de métricas.
+
+# Dados de Leitos (Mock) - Top 5 Estabelecimentos por Leitos
+TOP_5_LEITOS_MOCK = {
+    "3549904": [ # SJC
+        {"nome": "Hospital Municipal de SJC", "leitos": 500, "natureza": "Público"},
+        {"nome": "Hospital Vivalle", "leitos": 300, "natureza": "Privado"},
+        {"nome": "Hospital Policlin", "leitos": 250, "natureza": "Privado"},
+        {"nome": "Hospital Regional", "leitos": 200, "natureza": "Público"},
+        {"nome": "Santa Casa de SJC", "leitos": 150, "natureza": "Filantrópico"},
+    ],
+    "3550308": [ # SP
+        {"nome": "Hospital das Clínicas", "leitos": 2000, "natureza": "Público"},
+        {"nome": "Hospital Albert Einstein", "leitos": 1000, "natureza": "Privado"},
+        {"nome": "Hospital Sírio-Libanês", "leitos": 800, "natureza": "Privado"},
+        {"nome": "Hospital São Paulo", "leitos": 700, "natureza": "Público"},
+        {"nome": "Santa Casa de SP", "leitos": 600, "natureza": "Filantrópico"},
+    ],
+    "3304557": [ # RJ
+        {"nome": "Hospital Federal de Bonsucesso", "leitos": 1000, "natureza": "Público"},
+        {"nome": "Hospital Copa D'Or", "leitos": 500, "natureza": "Privado"},
+        {"nome": "Hospital Samaritano", "leitos": 400, "natureza": "Privado"},
+        {"nome": "Hospital Municipal Souza Aguiar", "leitos": 350, "natureza": "Público"},
+        {"nome": "Hospital Quinta D'Or", "leitos": 300, "natureza": "Privado"},
+    ],
+}
 # Em um ETL real, estes dados viriam de arquivos processados (CNES, ANS)
 # Para fins de PoC, usaremos dados mockados para o cálculo de métricas.
 
@@ -372,6 +444,41 @@ def process_market_intelligence(codigo_ibge: str, uf_sigla: str) -> Optional[dic
     bench_leitos_nacional = BENCHMARK_NACIONAL["razao_leitos_por_mil"]
     bench_cobertura_nacional = BENCHMARK_NACIONAL["cobertura_plano_saude_perc"]
     
+    # Novos Índices Demográficos (Idosos/PEA e Crianças/PEA)
+    # PEA: 15 a 59 anos (Aproximação)
+    # Idosos: 60+ anos
+    # Crianças: 0 a 14 anos
+    
+    pea = 0
+    idosos = 0
+    criancas = 0
+    
+    if piramide_etaria:
+        for item in piramide_etaria:
+            # Extrair a idade inicial do grupo (ex: "15 a 19 anos" -> 15)
+            # O IBGE usa grupos como "15 a 19 anos", "60 anos ou mais", "0 a 4 anos"
+            idade_str = item['idade_grupo'].split(' ')[0]
+            if idade_str.isdigit():
+                idade_inicial = int(idade_str)
+            elif idade_str == 'Menos': # Menos de 1 ano
+                idade_inicial = 0
+            elif idade_str == '100': # 100 anos ou mais
+                idade_inicial = 100
+            else:
+                continue # Ignora outros grupos que não sejam idade
+                
+            populacao = item['populacao']
+            
+            if idade_inicial >= 15 and idade_inicial <= 59:
+                pea += populacao
+            elif idade_inicial >= 60:
+                idosos += populacao
+            elif idade_inicial <= 14:
+                criancas += populacao
+                
+    idosos_por_pea = (idosos / pea) * 100 if pea > 0 else 0
+    criancas_por_pea = (criancas / pea) * 100 if pea > 0 else 0
+    
     # 5. Estruturação do Resultado
     
     # Simulação de enriquecimento CNPJ (para o mock da API)
@@ -382,6 +489,12 @@ def process_market_intelligence(codigo_ibge: str, uf_sigla: str) -> Optional[dic
         "cnae_principal": cnpj_mock.get('cnae_fiscal_descricao', 'N/A'),
         "porte": cnpj_mock.get('porte', 'N/A'),
     } if cnpj_mock else None
+    
+    # Dados de Mercado de Trabalho e Empresas
+    mercado_trabalho = MERCADO_TRABALHO_MOCK.get(codigo_ibge, {})
+    salario_medio_admissao = mercado_trabalho.get("salario_medio_admissao", 0)
+    bench_salario_nacional = BENCHMARK_NACIONAL["salario_medio_admissao"]
+    bench_desemprego_nacional = BENCHMARK_NACIONAL["taxa_desemprego"]
     
     return {
         "municipio_ibge": codigo_ibge,
@@ -395,6 +508,11 @@ def process_market_intelligence(codigo_ibge: str, uf_sigla: str) -> Optional[dic
             "brasil": pop_brasil,
             "perc_pop_uf": round(perc_pop_uf, 2),
             "piramide_etaria": piramide_etaria,
+            "indices_demograficos": {
+                "pea": pea,
+                "idosos_por_pea": round(idosos_por_pea, 2),
+                "criancas_por_pea": round(criancas_por_pea, 2),
+            }
         },
         
         # Leitos e Benchmarking
@@ -412,8 +530,11 @@ def process_market_intelligence(codigo_ibge: str, uf_sigla: str) -> Optional[dic
         # Estabelecimentos
         "estabelecimentos": {
             "por_tipo": leitos_data["estabelecimentos"],
-            "benchmarking_nacional": BENCHMARK_NACIONAL["estabelecimentos_por_tipo"] # Mock
+            "benchmarking_nacional": BENCHMARK_NACIONAL["estabelecimentos_por_tipo"], # Mock
+            "top_5_leitos": TOP_5_LEITOS_MOCK.get(codigo_ibge, []) # Mock dos 5 maiores
         },
+        
+
         
         # Planos de Saúde
         "planos_saude": {
@@ -422,10 +543,28 @@ def process_market_intelligence(codigo_ibge: str, uf_sigla: str) -> Optional[dic
             "benchmarking": {
                 "nacional": bench_cobertura_nacional,
                 "status": "Acima da Média Nacional" if cobertura_plano_saude_perc > bench_cobertura_nacional else "Abaixo da Média Nacional"
+            },
+            "ans_enriquecimento": ans_enriquecimento # Mock de dados ANS
+        },
+        
+        # Mercado de Trabalho e Empresas (Novo Enriquecimento)
+        "mercado_trabalho": {
+            "salario_medio_admissao": salario_medio_admissao,
+            "estoque_empregos": mercado_trabalho.get("estoque_empregos", 0),
+            "saldo_empregos_mes": mercado_trabalho.get("saldo_empregos_mes", 0),
+            "taxa_desemprego": mercado_trabalho.get("taxa_desemprego", 0),
+            "empresas_total": mercado_trabalho.get("empresas_total", 0),
+            "perc_empresas_uf": mercado_trabalho.get("perc_empresas_uf", 0),
+            "benchmarking": {
+                "salario_nacional": bench_salario_nacional,
+                "desemprego_nacional": bench_desemprego_nacional,
+                "status_salario": "Acima da Média Nacional" if salario_medio_admissao > bench_salario_nacional else "Abaixo da Média Nacional",
+                "status_desemprego": "Abaixo da Média Nacional" if mercado_trabalho.get("taxa_desemprego", 0) < bench_desemprego_nacional else "Acima da Média Nacional",
+                "status_tendencia": "Crescimento" if mercado_trabalho.get("saldo_empregos_mes", 0) > 0 else "Queda"
             }
         },
         
-        # Enriquecimento de CNPJ (Melhorado)
+        # Enriquecimento CNPJ (Mantido para fins de exemplo)
         "cnpj_enriquecido": cnpj_enriquecido
     }
 
