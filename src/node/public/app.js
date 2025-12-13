@@ -1,30 +1,3 @@
-// Carregar lista de cidades dinamicamente da API
-let estadosCidades = {};
-
-async function carregarCidades() {
-    try {
-        const response = await fetch('/api/v1/cities');
-        const result = await response.json();
-        
-        // Organizar cidades por estado
-        result.data.forEach(cidade => {
-            if (!estadosCidades[cidade.uf]) {
-                estadosCidades[cidade.uf] = { cidades: [] };
-            }
-            estadosCidades[cidade.uf].cidades.push(cidade);
-        });
-        
-        // Ordenar cidades por nome
-        Object.keys(estadosCidades).forEach(uf => {
-            estadosCidades[uf].cidades.sort((a, b) => a.nome.localeCompare(b.nome));
-        });
-        
-        inicializarEstados();
-    } catch (error) {
-        console.error('Erro ao carregar cidades:', error);
-    }
-}
-
 // Elementos do DOM
 const estadoSelect = document.getElementById('estado');
 const municipioSelect = document.getElementById('municipio');
@@ -34,35 +7,59 @@ const erroSection = document.getElementById('erroSection');
 const resultadosDiv = document.getElementById('resultados');
 const erroDiv = document.getElementById('erro');
 
-// Inicializar o dropdown de estados
-function inicializarEstados() {
-    const estados = Object.keys(estadosCidades).sort();
-    estados.forEach(sigla => {
-        const option = document.createElement('option');
-        option.value = sigla;
-        option.textContent = sigla;
-        estadoSelect.appendChild(option);
-    });
+let estados = [];
+let cidadesAtual = [];
+
+// Inicializar estados e cidades via API
+async function carregarEstados() {
+    try {
+        const response = await fetch('/api/v1/states');
+        const result = await response.json();
+        estados = result.data || [];
+
+        estados.forEach((estado) => {
+            const option = document.createElement('option');
+            option.value = estado.sigla;
+            option.textContent = `${estado.sigla} - ${estado.nome}`;
+            estadoSelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Erro ao carregar estados:', error);
+        mostrarErro('Não foi possível carregar a lista de estados agora.');
+    }
 }
 
-// Atualizar cidades quando estado é selecionado
-estadoSelect.addEventListener('change', function() {
-    const estadoSelecionado = this.value;
-    
-    // Limpar dropdown de cidades
+async function carregarCidadesPorUf(uf) {
     municipioSelect.innerHTML = '<option value="">-- Selecione um município --</option>';
-    municipioSelect.disabled = !estadoSelecionado;
+    municipioSelect.disabled = true;
     buscarBtn.disabled = true;
-    
-    if (estadoSelecionado) {
-        const cidades = estadosCidades[estadoSelecionado].cidades;
-        cidades.forEach(cidade => {
+
+    if (!uf) return;
+
+    try {
+        const response = await fetch(`/api/v1/cities?uf=${uf}`);
+        const result = await response.json();
+        cidadesAtual = result.data || [];
+
+        cidadesAtual.forEach((cidade) => {
             const option = document.createElement('option');
             option.value = cidade.ibge;
             option.textContent = cidade.nome;
             municipioSelect.appendChild(option);
         });
+
+        municipioSelect.disabled = false;
+    } catch (error) {
+        console.error('Erro ao carregar cidades:', error);
+        mostrarErro('Não foi possível carregar os municípios desta UF.');
     }
+}
+
+// Atualizar cidades quando estado é selecionado
+estadoSelect.addEventListener('change', function() {
+    const estadoSelecionado = this.value;
+
+    carregarCidadesPorUf(estadoSelecionado);
 });
 
 // Habilitar botão de busca quando município é selecionado
@@ -79,25 +76,23 @@ buscarBtn.addEventListener('click', async function() {
         mostrarErro('Por favor, selecione um município.');
         return;
     }
-    
-    // Mostrar loading
-    resultadosDiv.innerHTML = '<div class="loading"><div class="spinner"></div><p>Carregando dados...</p></div>';
+    const estadoSelecionado = estadoSelect.options[estadoSelect.selectedIndex].text;
+
+    resultadosDiv.innerHTML = '<div class="loading"><div class="spinner"></div><p>Consultando IBGE e DataSUS...</p></div>';
     resultadosSection.style.display = 'block';
     erroSection.style.display = 'none';
-    
+
     try {
         const response = await fetch(`/api/v1/market-intelligence/${ibgeCode}`);
-        
+
         if (!response.ok) {
             throw new Error(`Erro HTTP: ${response.status}`);
         }
-        
+
         const data = await response.json();
-        
+
         if (data.status === 'success') {
-            exibirResultados(data.data, municipioNome);
-            // Carregar análise OpenAI
-            carregarAnaliseOpenAI(ibgeCode);
+            exibirResultados(data.data, municipioNome, estadoSelecionado);
         } else {
             mostrarErro(data.message || 'Erro ao buscar dados.');
         }
@@ -107,222 +102,100 @@ buscarBtn.addEventListener('click', async function() {
 });
 
 // Exibir resultados com métricas comparativas
-function exibirResultados(dados, municipioNome) {
-    const pop = dados.populacao;
-    const saude = dados.saude;
-    const planosSaude = dados.planos_saude;
-    const mercadoTrabalho = dados.mercado_trabalho;
-    
-    // Calcular percentuais
-    const percPopBrasil = ((pop.municipal / pop.brasil) * 100).toFixed(4);
-    
+function exibirResultados(dados, municipioNome, estadoLabel) {
+    const pop = dados.populacao || {};
+    const saude = dados.saude || {};
+
+    const format = (value) => value ? Number(value).toLocaleString('pt-BR') : 'N/D';
+    const formatTipo = (tipo) => {
+        const normalizado = String(tipo || '').padStart(2, '0');
+        if (normalizado === '05') return 'Geral';
+        if (normalizado === '07') return 'Especializado';
+        return normalizado || 'N/D';
+    };
+    const destaques = saude.destaques || [];
+
     const html = `
         <div class="resultado-item">
-            <h2>${municipioNome} - ${dados.uf_sigla}</h2>
-            <p><strong>Código IBGE:</strong> ${dados.municipio_ibge}</p>
-            
-            <!-- SEÇÃO: POPULAÇÃO E DADOS DEMOGRÁFICOS -->
+            <h2>${municipioNome} - ${dados.municipio.uf}</h2>
+            <p><strong>UF / Região:</strong> ${estadoLabel} | ${dados.municipio.regiao || 'N/D'}</p>
+            <p><strong>Código IBGE:</strong> ${dados.municipio.ibge}</p>
+
+            <!-- POPULAÇÃO -->
             <div style="margin-top: 25px; padding: 20px; background: #f0f4ff; border-radius: 8px; border-left: 5px solid #667eea;">
-                <h3 style="color: #667eea; margin-bottom: 15px;">📊 POPULAÇÃO E DADOS DEMOGRÁFICOS</h3>
-                
+                <h3 style="color: #667eea; margin-bottom: 15px;">📊 População (IBGE)</h3>
                 <div class="resultado-grid">
                     <div class="resultado-card">
-                        <h4>População Municipal</h4>
-                        <p>${pop.municipal.toLocaleString('pt-BR')} hab.</p>
-                        <small style="color: #999;">% do Brasil: ${percPopBrasil}% | % do Estado: ${pop.perc_pop_uf}%</small>
+                        <h4>População Municipal (${pop.ano_municipal || 'ano N/D'})</h4>
+                        <p>${format(pop.municipal)} hab.</p>
+                        <small style="color: #999;">${pop.ano_brasil ? `Referência nacional ${pop.ano_brasil}` : ''}</small>
                     </div>
-                    
                     <div class="resultado-card">
-                        <h4>Idosos / PEA</h4>
-                        <p>${pop.indices_demograficos.idosos_pea}</p>
-                        <small style="color: #999;">Razão de Dependência</small>
+                        <h4>% do Estado</h4>
+                        <p>${pop.perc_pop_uf || 'N/D'}%</p>
+                        <small style="color: #999;">População UF: ${format(pop.uf)}</small>
                     </div>
-                    
                     <div class="resultado-card">
-                        <h4>Crianças / PEA</h4>
-                        <p>${pop.indices_demograficos.criancas_pea}</p>
-                        <small style="color: #999;">Razão de Dependência</small>
+                        <h4>% do Brasil</h4>
+                        <p>${pop.perc_pop_brasil || 'N/D'}%</p>
+                        <small style="color: #999;">População Brasil: ${format(pop.brasil)}</small>
                     </div>
                 </div>
-                
-                <div style="margin-top: 15px; padding: 15px; background: white; border-radius: 6px;">
-                    <h5 style="color: #333; margin-bottom: 10px;">Pirâmide Etária Completa</h5>
-                    <table style="width: 100%; font-size: 0.85em; border-collapse: collapse;">
-                        <tr style="background: #f5f5f5;">
-                            <th style="text-align: left; padding: 8px; border: 1px solid #ddd;">Faixa Etária</th>
-                            <th style="text-align: center; padding: 8px; border: 1px solid #ddd;">Homens</th>
-                            <th style="text-align: center; padding: 8px; border: 1px solid #ddd;">Mulheres</th>
-                        </tr>
-                        ${pop.piramide_etaria.map((item, idx) => {
-                            if (item.sexo === 'Homens') {
-                                const mulheres = pop.piramide_etaria[idx + 1];
-                                return `
-                                    <tr style="border-bottom: 1px solid #e0e0e0;">
-                                        <td style="padding: 8px; border: 1px solid #ddd;">${item.idade_grupo}</td>
-                                        <td style="text-align: center; padding: 8px; border: 1px solid #ddd;">${item.populacao.toLocaleString('pt-BR')}</td>
-                                        <td style="text-align: center; padding: 8px; border: 1px solid #ddd;">${mulheres ? mulheres.populacao.toLocaleString('pt-BR') : 'N/A'}</td>
+            </div>
+
+            <!-- SAÚDE -->
+            <div style="margin-top: 25px; padding: 20px; background: #fff8ef; border-radius: 8px; border-left: 5px solid #ff9800;">
+                <h3 style="color: #ff9800; margin-bottom: 15px;">🏥 Estabelecimentos de Saúde (CNES)</h3>
+                <div class="resultado-grid">
+                    <div class="resultado-card" style="background:#fff0e0; border-left-color:#ff9800;">
+                        <h4>Total de Estabelecimentos</h4>
+                        <p>${format(saude.total_estabelecimentos)}</p>
+                        <small style="color:#999;">Incluindo todos os tipos registrados no CNES</small>
+                    </div>
+                    <div class="resultado-card" style="background:#fff0e0; border-left-color:#ff9800;">
+                        <h4>Atendem SUS</h4>
+                        <p>${format(saude.atendimento_sus)}</p>
+                        <small style="color:#999;">Ambulatorial SUS = SIM</small>
+                    </div>
+                    <div class="resultado-card" style="background:#fff0e0; border-left-color:#ff9800;">
+                        <h4>Hospitalares</h4>
+                        <p>${format(saude.estabelecimentos_hospitalares)}</p>
+                        <small style="color:#999;">Possuem atendimento hospitalar</small>
+                    </div>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <h4 style="color: #ff6f00; margin-bottom: 10px;">Principais estabelecimentos</h4>
+                    ${
+                        destaques.length
+                            ? `
+                                <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+                                    <tr style="background: #ffe0b2;">
+                                        <th style="text-align:left; padding:8px;">Nome</th>
+                                        <th style="text-align:center; padding:8px;">Tipo</th>
+                                        <th style="text-align:center; padding:8px;">SUS</th>
+                                        <th style="text-align:center; padding:8px;">Hospitalar</th>
                                     </tr>
-                                `;
-                            }
-                            return '';
-                        }).join('')}
-                    </table>
+                                    ${destaques.map(est => `
+                                        <tr style="border-bottom: 1px solid #f0d9b5;">
+                                            <td style="padding:8px;">${est.nome || 'Não informado'}</td>
+                                            <td style="text-align:center; padding:8px;">${formatTipo(est.tipo_unidade)}</td>
+                                            <td style="text-align:center; padding:8px;">${est.sus ? 'Sim' : 'Não'}</td>
+                                            <td style="text-align:center; padding:8px;">${est.hospitalar ? 'Sim' : 'Não'}</td>
+                                        </tr>
+                                    `).join('')}
+                                </table>
+                              `
+                            : `<p style="color:#555;">Sem estabelecimentos destacados ou dados indisponíveis para este município.</p>`
+                    }
+                    ${saude.warning ? `<p style="color:#d32f2f; margin-top:10px;">${saude.warning}</p>` : ''}
                 </div>
             </div>
-            
-            <!-- SEÇÃO: LEITOS E BENCHMARKING -->
-            <div style="margin-top: 25px; padding: 20px; background: #fff0f5; border-radius: 8px; border-left: 5px solid #e91e63;">
-                <h3 style="color: #e91e63; margin-bottom: 15px;">🏥 LEITOS E INFRAESTRUTURA HOSPITALAR</h3>
-                
-                <div class="resultado-grid">
-                    <div class="resultado-card" style="background: #ffe0e6; border-left-color: #e91e63;">
-                        <h4>Razão Leitos/1000 hab.</h4>
-                        <p>${saude.razao_leitos_por_mil}</p>
-                        <small style="color: #999;">Municipal: ${saude.benchmarking.municipal} | Estadual: ${saude.benchmarking.estadual} | Nacional: ${saude.benchmarking.nacional}</small>
-                        <small style="color: #666; margin-top: 5px; display: block;"><strong>Status Estadual:</strong> ${saude.benchmarking.status_estadual} | <strong>Status Nacional:</strong> ${saude.benchmarking.status_nacional}</small>
-                    </div>
-                    
-                    <div class="resultado-card" style="background: #ffe0e6; border-left-color: #e91e63;">
-                        <h4>Distribuição de Leitos</h4>
-                        <p>Públicos: ${saude.leitos_publicos_perc}% | Privados: ${saude.leitos_privados_perc}%</p>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- SEÇÃO: TOP 5 MAIORES ESTABELECIMENTOS -->
-            <div style="margin-top: 25px; padding: 20px; background: #fef3e0; border-radius: 8px; border-left: 5px solid #ff6f00;">
-                <h3 style="color: #ff6f00; margin-bottom: 15px;">🏢 TOP 5 MAIORES ESTABELECIMENTOS (POR LEITOS)</h3>
-                
-                <table style="width: 100%; font-size: 0.9em; margin-bottom: 15px;">
-                    <tr style="background: #ffe0b2;">
-                        <th style="text-align: left; padding: 10px;">Estabelecimento</th>
-                        <th style="text-align: center; padding: 10px;">Leitos</th>
-                        <th style="text-align: center; padding: 10px;">Natureza</th>
-                    </tr>
-                    ${saude.top_5_estabelecimentos.map(est => `
-                        <tr style="border-bottom: 1px solid #e0e0e0;">
-                            <td style="padding: 10px;">${est.nome}</td>
-                            <td style="text-align: center; padding: 10px;"><strong>${est.leitos}</strong></td>
-                            <td style="text-align: center; padding: 10px;">
-                                <span style="padding: 4px 8px; border-radius: 4px; font-size: 0.85em; 
-                                    ${est.natureza === 'Público' ? 'background: #4caf50; color: white;' : 
-                                      est.natureza === 'Privado' ? 'background: #2196f3; color: white;' : 
-                                      'background: #ff9800; color: white;'}">
-                                    ${est.natureza}
-                                </span>
-                            </td>
-                        </tr>
-                    `).join('')}
-                </table>
-            </div>
-            
-            <!-- SEÇÃO: PLANOS DE SAÚDE (ANS) -->
-            <div style="margin-top: 25px; padding: 20px; background: #fff3e0; border-radius: 8px; border-left: 5px solid #ff9800;">
-                <h3 style="color: #ff9800; margin-bottom: 15px;">💳 COBERTURA DE PLANOS DE SAÚDE (ANS)</h3>
-                
-                <div class="resultado-grid">
-                    <div class="resultado-card" style="background: #ffe8cc; border-left-color: #ff9800;">
-                        <h4>Beneficiários</h4>
-                        <p>${planosSaude.beneficiarios.toLocaleString('pt-BR')}</p>
-                    </div>
-                    
-                    <div class="resultado-card" style="background: #ffe8cc; border-left-color: #ff9800;">
-                        <h4>Cobertura Local</h4>
-                        <p>${planosSaude.cobertura_plano_saude_perc}%</p>
-                        <small style="color: #999;">Estadual: ${planosSaude.benchmarking.estadual}% | Nacional: ${planosSaude.benchmarking.nacional}%</small>
-                        <small style="color: #666; margin-top: 5px; display: block;"><strong>Status Estadual:</strong> ${planosSaude.benchmarking.status_estadual} | <strong>Status Nacional:</strong> ${planosSaude.benchmarking.status_nacional}</small>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- SEÇÃO: MERCADO DE TRABALHO E EMPRESAS (CAGED) -->
-            <div style="margin-top: 25px; padding: 20px; background: #e0f7fa; border-radius: 8px; border-left: 5px solid #00bcd4;">
-                <h3 style="color: #00bcd4; margin-bottom: 15px;">💼 MERCADO DE TRABALHO E EMPRESAS (CAGED)</h3>
-                
-                <div class="resultado-grid">
-                    <div class="resultado-card" style="background: #b2ebf2; border-left-color: #00bcd4;">
-                        <h4>Salário Médio de Admissão</h4>
-                        <p>R$ ${mercadoTrabalho.salario_medio_admissao.toLocaleString('pt-BR')}</p>
-                        <small style="color: #999;">Estadual: R$ ${mercadoTrabalho.benchmarking.salario_estadual.toLocaleString('pt-BR')} | Nacional: R$ ${mercadoTrabalho.benchmarking.salario_nacional.toLocaleString('pt-BR')}</small>
-                        <small style="color: #666; margin-top: 5px; display: block;"><strong>Status Estadual:</strong> ${mercadoTrabalho.benchmarking.status_salario_estadual} | <strong>Status Nacional:</strong> ${mercadoTrabalho.benchmarking.status_salario_nacional}</small>
-                    </div>
-                    
-                    <div class="resultado-card" style="background: #b2ebf2; border-left-color: #00bcd4;">
-                        <h4>Taxa de Desemprego</h4>
-                        <p>${mercadoTrabalho.taxa_desemprego}%</p>
-                        <small style="color: #999;">Estadual: ${mercadoTrabalho.benchmarking.desemprego_estadual}% | Nacional: ${mercadoTrabalho.benchmarking.desemprego_nacional}%</small>
-                    </div>
-                    
-                    <div class="resultado-card" style="background: #b2ebf2; border-left-color: #00bcd4;">
-                        <h4>Estoque de Empregos</h4>
-                        <p>${mercadoTrabalho.estoque_empregos.toLocaleString('pt-BR')}</p>
-                        <small style="color: #999;">Saldo Mês: ${mercadoTrabalho.saldo_empregos_mes > 0 ? '+' : ''}${mercadoTrabalho.saldo_empregos_mes.toLocaleString('pt-BR')}</small>
-                    </div>
-                    
-                    <div class="resultado-card" style="background: #b2ebf2; border-left-color: #00bcd4;">
-                        <h4>Total de Empresas</h4>
-                        <p>${mercadoTrabalho.empresas_total.toLocaleString('pt-BR')}</p>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- SEÇÃO: ANÁLISE OPENAI -->
-            <div id="analiseOpenAI" style="margin-top: 25px; padding: 20px; background: #f3e5f5; border-radius: 8px; border-left: 5px solid #9c27b0;">
-                <h3 style="color: #9c27b0; margin-bottom: 15px;">🤖 ANÁLISE DE INTELIGÊNCIA DE MERCADO (OpenAI)</h3>
-                <div style="text-align: center; padding: 20px;">
-                    <div class="spinner"></div>
-                    <p>Gerando análise...</p>
-                </div>
-            </div>
+
         </div>
     `;
-    
-    resultadosDiv.innerHTML = html;
-}
 
-// Carregar análise OpenAI
-async function carregarAnaliseOpenAI(ibgeCode) {
-    try {
-        const response = await fetch(`/api/v1/analysis/${ibgeCode}`);
-        const result = await response.json();
-        
-        if (result.status === 'success') {
-            const analysis = result.analysis;
-            const analiseDiv = document.getElementById('analiseOpenAI');
-            
-            let html = `
-                <h3 style="color: #9c27b0; margin-bottom: 15px;">🤖 ANÁLISE DE INTELIGÊNCIA DE MERCADO (OpenAI)</h3>
-                
-                <div style="margin-bottom: 20px;">
-                    <h4 style="color: #d32f2f; margin-bottom: 10px;">⚠️ Problemas e Desafios</h4>
-                    <ul style="margin: 0; padding-left: 20px;">
-                        ${analysis.problemas_desafios.map(item => `<li style="margin-bottom: 8px;">${item}</li>`).join('')}
-                    </ul>
-                </div>
-                
-                <div style="margin-bottom: 20px;">
-                    <h4 style="color: #388e3c; margin-bottom: 10px;">✅ Oportunidades de Investimento</h4>
-                    <ul style="margin: 0; padding-left: 20px;">
-                        ${analysis.oportunidades.map(item => `<li style="margin-bottom: 8px;">${item}</li>`).join('')}
-                    </ul>
-                </div>
-                
-                <div>
-                    <h4 style="color: #0277bd; margin-bottom: 10px;">📈 Fatos Recentes e Tendências</h4>
-                    <ul style="margin: 0; padding-left: 20px;">
-                        ${analysis.fatos_tendencias.map(item => `<li style="margin-bottom: 8px;">${item}</li>`).join('')}
-                    </ul>
-                </div>
-            `;
-            
-            document.getElementById('analiseOpenAI').innerHTML = html;
-        } else {
-            document.getElementById('analiseOpenAI').innerHTML = `<p style="color: #d32f2f;">Erro ao gerar análise: ${result.message}</p>`;
-        }
-    } catch (error) {
-        console.error('Erro ao carregar análise OpenAI:', error);
-        document.getElementById('analiseOpenAI').innerHTML = `<p style="color: #d32f2f;">Erro ao conectar com a análise: ${error.message}</p>`;
-    }
+    resultadosDiv.innerHTML = html;
 }
 
 // Mostrar erro
@@ -333,4 +206,4 @@ function mostrarErro(mensagem) {
 }
 
 // Inicializar ao carregar a página
-window.addEventListener('DOMContentLoaded', carregarCidades);
+window.addEventListener('DOMContentLoaded', carregarEstados);
